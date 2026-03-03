@@ -631,3 +631,247 @@ Ownership and relationships should be controlled by the backend,
 not trusted from user input.
 
 ---
+
+# 15. TESTING APIs AND FIXING PERMISSION GAPS
+
+## Why Permissions Need has_permission + has_object_permission
+
+DRF checks permissions in two layers:
+
+1. has_permission (view-level)
+
+- Runs before accessing a specific object
+- Controls actions like POST on list endpoints (e.g. /api/discussions/)
+
+2. has_object_permission (object-level)
+
+- Runs when acting on a specific object
+- Controls actions like PUT/PATCH/DELETE on a specific record (e.g. /api/discussions/1/)
+
+We originally only implemented has_object_permission.
+That can allow unauthenticated POST requests to reach create logic because POST does not have an object yet.
+
+Fix:
+
+- Add has_permission to block unsafe methods unless the user is authenticated.
+
+---
+
+## Why Automated API Tests Matter
+
+API tests confirm:
+
+- Authentication rules (401 when unauthenticated)
+- Authorization rules (403 when authenticated but forbidden)
+- Correct role behavior (learner vs mentor vs admin)
+- Correct ownership enforcement
+
+---
+
+## DRF APITestCase and force_authenticate
+
+We used DRF's APITestCase + APIClient for API testing.
+
+We used:
+
+client.force_authenticate(user=...)
+
+This simulates an authenticated user without calling the JWT login endpoint every time.
+
+It makes tests:
+
+- Faster
+- Clearer
+- Focused on permission behavior
+
+---
+
+## Coverage (target 75%+)
+
+We use coverage.py to measure how much code is executed by tests.
+
+Commands:
+
+- coverage run manage.py test
+- coverage report -m
+
+Goal: keep coverage above 75% by testing core behaviors and rules.
+
+---
+
+# 16. FIXING DRF TEST CLIENT WARNINGS (APIClient vs Django Client)
+
+## Why VS Code (Pylance) Complained
+
+Pylance sometimes assumes `self.client` is Django's default test Client.
+
+Django Client does not have:
+
+- force_authenticate()
+- Response.data
+
+But DRF's APIClient does.
+
+So the code can run fine, but the editor cannot infer the correct type.
+
+---
+
+## Fix: Use APIClient Explicitly
+
+We imported APIClient and assigned it in setUp:
+
+```python
+from rest_framework.test import APIClient
+
+def setUp(self):
+    super().setUp()
+    self.client = APIClient()
+```
+
+Now Pylance recognizes:
+
+- self.client.force_authenticate(...)
+- response.data
+
+---
+
+# 17. FIXING DJANGO TEST DISCOVERY ERRORS (tests.py vs tests/ folder)
+
+## The Problem
+
+Django test discovery failed with an import error like:
+
+"tests module incorrectly imported ... Expected ..."
+
+This usually happens when an app contains BOTH:
+
+- discussions/tests.py (module)
+  AND
+- discussions/tests/ (package/folder)
+
+Python and Django can get confused because both are named `tests`.
+
+---
+
+## The Fix
+
+We chose one clean structure:
+
+Use `discussions/tests/` folder for all tests.
+
+So we removed the conflicting file:
+
+- deleted `discussions/tests.py`
+
+And ensured the tests folder is a valid Python package by having:
+
+- discussions/tests/**init**.py
+
+---
+
+## Rule of Thumb
+
+Use:
+
+- tests.py for tiny projects
+- tests/ package for bigger projects with multiple test files
+
+This project is large, so `tests/` is the better structure.
+
+---
+
+# 18. FIXING TEST FAILURES: Auth Guards and Nested Serializer Design
+
+## Failure 1: Unauthenticated POST Tried to Create a Discussion
+
+The test expected 401 Unauthorized, but the request reached:
+
+```python
+serializer.save(author=request.user)
+```
+
+When unauthenticated:
+request.user = AnonymousUser
+
+Django raised:
+"Discussion.author must be a User instance"
+
+### Lesson
+
+Permissions must block unsafe methods (POST/PUT/PATCH/DELETE) at the view level before perform_create runs.
+
+### Fix:
+
+Implement has_permission to block unsafe methods unless authenticated.
+
+## Failure 2: Nested Comment POST Returned 400
+
+Our nested endpoint:
+
+POST /api/discussions/<id>/comments/
+
+sends only:
+
+```json
+{ "content": "..." }
+```
+
+But the CommentSerializer required "discussion" in input, causing 400.
+
+### Fix
+
+Make discussion read-only in serializer and set it from the URL:
+
+- discussion is provided by the endpoint (not user input)
+- backend saves: discussion=discussion_from_url
+
+### Principle
+
+When a relationship is determined by the URL, do not require it from the request body.
+
+---
+
+# 19. Handling Anonymous Users in Permission Logic
+
+## The Problem
+
+Unauthenticated requests use:
+
+request.user = AnonymousUser
+
+AnonymousUser does NOT have our custom field:
+
+- role
+
+So accessing:
+
+request.user.role
+
+causes:
+
+AttributeError: 'AnonymousUser' object has no attribute 'role'
+
+---
+
+## The Fix
+
+We updated our permission classes to:
+
+1. Block unsafe methods early using has_permission:
+
+- SAFE_METHODS (GET/HEAD/OPTIONS) → allowed
+- POST/PUT/PATCH/DELETE → require authentication
+
+2. Add an authentication check before using role inside has_object_permission:
+
+- If not authenticated → return False
+
+---
+
+## Key Rule
+
+Never access custom user fields (like role) unless:
+
+request.user.is_authenticated == True
+
+This prevents crashes and ensures unauthorized users are rejected properly.

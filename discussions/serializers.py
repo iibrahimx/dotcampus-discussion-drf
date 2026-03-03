@@ -19,6 +19,7 @@ class DiscussionSerializer(serializers.ModelSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     author = serializers.ReadOnlyField(source="author.username")
+    discussion = serializers.ReadOnlyField(source="discussion.id")
 
     class Meta:
         model = Comment
