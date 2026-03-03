@@ -1,10 +1,10 @@
-# DotCampus Discussion API — Learning Notes
+# DotCampus Discussion API — LEARNING NOTES
 
 This file documents the architectural and conceptual learning behind building a secure RESTful API using Django REST Framework and JWT authentication.
 
 ---
 
-# 1. Why We Created a Custom User Model First
+# 1. WHY WE CREATED A CUSTOM User MODEL FIRST
 
 ## Problem:
 
@@ -40,7 +40,7 @@ class User(AbstractUser):
 
 ---
 
-# 2. What is Django REST Framework (DRF)?
+# 2. WHAT IS DJANGO REST FRAMEWORK (DRF)?
 
 Django by default returns HTML.
 
@@ -56,7 +56,7 @@ DRF transforms Django into an API framework:
 
 ---
 
-# 3. What is a Serializer?
+# 3. WHAT IS A SERIALIZER?
 
 ## A serializer is:
 
@@ -87,7 +87,7 @@ DRF transforms Django into an API framework:
 
 ---
 
-# 4. Why Not Save Password Directly?
+# 4. WHY NOT SAVE PASSWORD DIRECTLY?
 
 **We used:**
 
@@ -112,7 +112,7 @@ If we used .create(), password would be stored as plain text.
 
 ---
 
-# 5. What is JWT?
+# 5. WHAT IS JWT?
 
 JWT = JSON Web Token
 
@@ -143,7 +143,7 @@ Stateless authentication.
 
 ---
 
-# 6. What is Authentication vs Authorization?
+# 6. WHAT IS AUTHENTICATION VS. AUTHORIZATION?
 
 ## Authentication:
 
@@ -160,7 +160,7 @@ Stateless authentication.
 
 ---
 
-# 7. Why We Created users/urls.py and discussions/urls.py
+# 7. WHY WE CREATED users/urls.py AND discussions/urls.py
 
 Django requires included URL modules to exist.
 
@@ -181,7 +181,7 @@ Always create URL modules before including them.
 
 ---
 
-# 8. Why We Commit Frequently
+# 8. WHY WE COMMIT FREQUENTLY
 
 **Frequent commits:**
 
@@ -192,3 +192,76 @@ Always create URL modules before including them.
 - Demonstrate professional workflow
 
 ---
+
+# 9. DESIGNING THE DISCUSSION MODELS
+
+**What is a Discussion?**
+
+A discussion must have:
+
+- title
+- body/content
+- author (User)
+- created_at
+- updated_at
+
+## Relationship Design
+
+**Who owns it?**
+
+A discussion belongs to exactly one user.
+
+This creates a:
+
+User (1) → Discussion (many) relationship.
+
+We implemented:
+
+```python
+author = models.ForeignKey(
+    settings.AUTH_USER_MODEL,
+    on_delete=models.CASCADE,
+    related_name="discussions"
+)
+```
+
+## Why settings.AUTH_USER_MODEL?
+
+Instead of importing User directly, we use:
+
+```python
+settings.AUTH_USER_MODEL
+```
+
+This keeps the model flexible and compatible with our custom user model.
+
+## Why related_name="discussions"?
+
+It allows:
+
+```python
+user.discussions.all()
+```
+
+Instead of Django's default:
+
+```python
+user.discussion_set.all()
+```
+
+Cleaner naming improves readability.
+
+## Why auto_now_add vs auto_now?
+
+- auto_now_add=True → set only when created.
+- auto_now=True → updates every time the object is saved.
+
+This ensures proper tracking of creation and modification timestamps.
+
+## Architectural Principle
+
+Models define the shape of your database.
+
+Everything else (serializers, views, permissions) depends on models.
+
+So model design must be intentional and clear before building
