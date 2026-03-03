@@ -502,3 +502,69 @@ Authorization answers:
 "What are you allowed to do?"
 
 We are now implementing real authorization logic.
+
+---
+
+# 13. IMPLEMENTING THE COMMENT SYSTEM
+
+## Domain Design
+
+A comment belongs to:
+
+- One user (author)
+- One discussion
+
+Relationships:
+
+User (1) → Comment (many)
+Discussion (1) → Comment (many)
+
+---
+
+## Why ForeignKey with related_name?
+
+Using:
+
+related_name="comments"
+
+Allows:
+
+discussion.comments.all()
+user.comments.all()
+
+Clean reverse relationships improve readability.
+
+---
+
+## Comment Authorization Rules
+
+- Learner → can create comment.
+- Mentor → can create comment.
+- Admin → can delete any comment.
+
+---
+
+## Custom Comment Permission
+
+We created:
+
+class IsCommentAuthorOrAdmin(BasePermission)
+
+Logic:
+
+1. SAFE_METHODS allowed.
+2. Admin → full access.
+3. Otherwise → only author can modify.
+
+---
+
+## Architectural Insight
+
+We now have:
+
+- Multi-model relationships
+- Nested data logic
+- Role-based permissions
+- Object-level authorization
+
+The API is now becoming a structured system, not just endpoints.
