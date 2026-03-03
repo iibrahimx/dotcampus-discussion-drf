@@ -265,3 +265,166 @@ Models define the shape of your database.
 Everything else (serializers, views, permissions) depends on models.
 
 So model design must be intentional and clear before building
+
+---
+
+# 10. IMPLEMENTING DISCUSSION CRUD WITH ModelViewSet
+
+## What is a ModelSerializer?
+
+ModelSerializer automatically maps model fields to JSON fields and handles validation and saving.
+
+It reduces boilerplate code and keeps API logic clean.
+
+## Why is author ReadOnly?
+
+We defined:
+
+```python
+author = serializers.ReadOnlyField(source="author.username")
+```
+
+This ensures:
+
+- Users cannot manually assign an author.
+- Ownership is determined by the authenticated user.
+- Prevents impersonation.
+
+## What is a ModelViewSet?
+
+ModelViewSet automatically provides full CRUD functionality:
+
+- list → GET /discussions/
+- retrieve → GET /discussions/{id}/
+- create → POST
+- update → PUT
+- partial_update → PATCH
+- destroy → DELETE
+
+Instead of writing multiple views, everything is handled in one class.
+
+## What is `perform_create()`?
+
+When creating a discussion, we override:
+
+```python
+def perform_create(self, serializer):
+    serializer.save(author=self.request.user)
+```
+
+This automatically assigns the currently authenticated user as the author.
+
+It enforces ownership securely.
+
+## What is a Router?
+
+A DefaultRouter automatically generates RESTful URLs for ViewSets.
+
+Instead of manually writing URL patterns, the router generates:
+
+- GET /api/discussions/
+- POST /api/discussions/
+- GET /api/discussions/{id}/
+- PUT /api/discussions/{id}/
+- DELETE /api/discussions/{id}/
+
+This keeps the API clean and scalable.
+
+## Architectural Insight
+
+Model → Serializer → ViewSet → Router
+
+Each layer builds on the previous one.
+
+Models define data.
+Serializers validate and transform data.
+ViewSets define behavior.
+Routers expose endpoints.
+
+---
+
+# 11. UNDERSTANDING JWT AUTHENTICATION IN PRACTICE
+
+## Why POST Failed Without Token
+
+Our DiscussionViewSet uses:
+
+permission_classes = [IsAuthenticatedOrReadOnly]
+
+This means:
+
+- GET requests are allowed for everyone.
+- POST, PUT, DELETE require authentication.
+
+Without authentication, the API returns 401 Unauthorized.
+
+---
+
+## What Happens During Login?
+
+We use the endpoint:
+
+POST /api/auth/login/
+
+When valid credentials are provided, the server returns:
+
+{
+"refresh": "...",
+"access": "..."
+}
+
+---
+
+## What Is Access vs Refresh Token?
+
+Access Token:
+
+- Short-lived
+- Used to access protected endpoints
+
+Refresh Token:
+
+- Long-lived
+- Used to request new access tokens
+
+For most API calls, we use the ACCESS token.
+
+---
+
+## How To Use JWT In Postman
+
+1. Login to obtain access token.
+2. Copy the access token.
+3. In Postman:
+   - Go to Authorization tab
+   - Select "Bearer Token"
+   - Paste the access token
+4. Send the request.
+
+Postman automatically sends:
+
+Authorization: Bearer <access_token>
+
+---
+
+## What Happens Internally?
+
+When the request reaches the server:
+
+1. JWTAuthentication reads the Authorization header.
+2. Validates the token.
+3. Decodes the payload.
+4. Extracts user_id.
+5. Sets request.user.
+
+This is why:
+
+serializer.save(author=self.request.user)
+
+works correctly.
+
+Without token:
+request.user = AnonymousUser
+
+With token:
+request.user = Logged-in user
