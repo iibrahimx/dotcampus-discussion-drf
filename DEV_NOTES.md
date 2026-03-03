@@ -568,3 +568,66 @@ We now have:
 - Object-level authorization
 
 The API is now becoming a structured system, not just endpoints.
+
+---
+
+# 14. NESTED ENDPOINTS WITH ViewSet ACTIONS
+
+## Why Nested Endpoints?
+
+The requirement says:
+
+- View all comments on a single discussion
+- Comment on a discussion
+
+A clean REST design is:
+
+- GET /api/discussions/<id>/comments/
+- POST /api/discussions/<id>/comments/
+
+This makes the API more intuitive than manually filtering all comments.
+
+---
+
+## What is a ViewSet Action?
+
+DRF allows adding extra endpoints to a ViewSet using:
+
+@action(detail=True, methods=[...])
+
+- detail=True means the endpoint is tied to a specific object (one discussion).
+- The router automatically generates the URL without extra url patterns.
+
+---
+
+## How the Action Works
+
+Inside the action we do:
+
+discussion = self.get_object()
+
+This gets the Discussion using the ID from the URL.
+
+For GET:
+
+- return discussion.comments.all()
+
+For POST:
+
+- create a Comment, but force:
+  - author = request.user
+  - discussion = discussion from URL
+
+This prevents users from:
+
+- impersonating an author
+- attaching a comment to a different discussion ID
+
+---
+
+## Security Principle
+
+Ownership and relationships should be controlled by the backend,
+not trusted from user input.
+
+---

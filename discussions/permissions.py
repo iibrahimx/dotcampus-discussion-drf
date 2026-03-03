@@ -6,6 +6,13 @@ class IsAuthorOrRoleBased(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
 
+        def has_permission(self, request, view):
+            # Allow read-only for everyone
+            if request.method in permissions.SAFE_METHODS:
+                return True
+            # Block write actions unless logged in
+            return request.user and request.user.is_authenticated
+
         # SAFE METHODS (GET, HEAD, OPTIONS) are allowed for everyone
         if request.method in permissions.SAFE_METHODS:
             return True
@@ -25,6 +32,11 @@ class IsAuthorOrRoleBased(permissions.BasePermission):
 
 # Comment permission class
 class IsCommentAuthorOrAdmin(permissions.BasePermission):
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return request.user and request.user.is_authenticated
 
     def has_object_permission(self, request, view, obj):
 
