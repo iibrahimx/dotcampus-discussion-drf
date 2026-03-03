@@ -428,3 +428,77 @@ request.user = AnonymousUser
 
 With token:
 request.user = Logged-in user
+
+---
+
+# 12. IMPLEMENTING ROLE-BASED OBJECT PERMISSIONS
+
+## Why Default Permissions Were Not Enough
+
+Using IsAuthenticatedOrReadOnly only checks:
+
+- Is user logged in?
+
+It does NOT check:
+
+- Who owns the object?
+- What role the user has?
+
+So we created a custom permission class.
+
+---
+
+## What is Object-Level Permission?
+
+Object-level permissions run when accessing a specific object.
+
+They allow fine-grained control like:
+
+- "User can only edit their own discussion"
+- "Mentor can edit any discussion"
+- "Admin has full access"
+
+---
+
+## Custom Permission Logic
+
+We created:
+
+class IsAuthorOrRoleBased(BasePermission)
+
+Inside:
+
+def has_object_permission(self, request, view, obj):
+
+### Logic Flow:
+
+1. SAFE_METHODS (GET, HEAD, OPTIONS) → allowed for everyone.
+2. If role is admin → full access.
+3. If role is mentor → allow update only.
+4. Otherwise → only author can modify.
+
+---
+
+## Why Order Matters
+
+Permissions are evaluated top-down.
+
+We check:
+
+- Admin first
+- Then mentor
+- Then ownership
+
+This creates a clear hierarchy.
+
+---
+
+## Key Concept
+
+Authentication answers:
+"Who are you?"
+
+Authorization answers:
+"What are you allowed to do?"
+
+We are now implementing real authorization logic.
